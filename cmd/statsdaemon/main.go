@@ -74,6 +74,10 @@ var (
 	cpuprofile  = flag.String("cpuprofile", "", "write cpu profile to file")
 	memprofile  = flag.String("memprofile", "", "write memory profile to this file")
 	GitHash     = "(none)"
+	orgid    = flag.Int("orgid", 1, "orgid, default: 1")
+
+	enablekinesis     = flag.Bool("enablekinesis", false, "eanble sending to kinesis default: false")
+	enablegraphite     = flag.Bool("enablegraphite", true, "enable sending to graphite default: true")
 )
 
 func expand_cfg_vars(in string) (out string) {
@@ -122,13 +126,12 @@ func main() {
 
 	conf.ParseAll()
 
+	proftrigHeapFreq := dur.MustParseNDuration("proftrigger_heap_freq", *proftrigHeapFreqStr)
+	proftrigHeapMinDiff := int(dur.MustParseNDuration("proftrigger_heap_min_diff", *proftrigHeapMinDiffStr))
 
-	proftrigHeapFreq := dur.MustParseUsec("proftrigger_heap_freq", *proftrigHeapFreqStr)
-	proftrigHeapMinDiff := int(dur.MustParseUNsec("proftrigger_heap_min_diff", *proftrigHeapMinDiffStr))
-
-	proftrigCpuFreq := dur.MustParseUsec("proftrigger_cpu_freq", *proftrigCpuFreqStr)
-	proftrigCpuMinDiff := int(dur.MustParseUNsec("proftrigger_cpu_min_diff", *proftrigCpuMinDiffStr))
-	proftrigCpuDur := int(dur.MustParseUNsec("proftrigger_cpu_dur", *proftrigCpuDurStr))
+	proftrigCpuFreq := dur.MustParseNDuration("proftrigger_cpu_freq", *proftrigCpuFreqStr)
+	proftrigCpuMinDiff := int(dur.MustParseNDuration("proftrigger_cpu_min_diff", *proftrigCpuMinDiffStr))
+	proftrigCpuDur := int(dur.MustParseNDuration("proftrigger_cpu_dur", *proftrigCpuDurStr))
 
 	if proftrigHeapFreq > 0 {
 		errors := make(chan error)
@@ -193,7 +196,7 @@ func main() {
 		Prefix_m20ne_timers:   strings.Replace(*prefix_m20_timers, "=", "_is_", -1),
 	}
 
-	daemon := statsdaemon.New(inst, formatter, *flush_rates, *flush_counts, *pct, *flushInterval, MAX_UNPROCESSED_PACKETS, *max_timers_per_s, *debug, signalchan)
+	daemon := statsdaemon.New(inst, formatter, *flush_rates, *flush_counts, *pct, *flushInterval, MAX_UNPROCESSED_PACKETS, *max_timers_per_s, *debug, signalchan, *orgid, *enablegraphite, *enablekinesis)
 	if *debug {
 		consumer := make(chan interface{}, 100)
 		daemon.Invalid_lines.Register(consumer)
@@ -204,4 +207,5 @@ func main() {
 		}()
 	}
 	daemon.Run(*listen_addr, *admin_addr, *graphite_addr)
+
 }

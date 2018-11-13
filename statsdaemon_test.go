@@ -394,13 +394,13 @@ func BenchmarkSameTimersAddAndProcess(b *testing.B) {
 }
 
 func BenchmarkIncomingMetrics(b *testing.B) {
-	daemon := New("test", formatM1Legacy, false, false, out.Percentiles{}, 10, 1000, 1000, false, nil)
+	daemon := New("test", formatM1Legacy, false, false, out.Percentiles{}, 10, 1000, 1000, true, nil, 1, true, false)
 	daemon.Clock = clock.NewMock()
 	total := float64(0)
 	totalLock := sync.Mutex{}
 	daemon.submitFunc = func(c *out.Counters, g *out.Gauges, t *out.Timers, deadline time.Time) {
 		totalLock.Lock()
-		total += c.Values["service_is_statsdaemon.instance_is_test.direction_is_in.statsd_type_is_counter.mtype_is_count.unit_is_Metric"]
+		total += c.Values["internal.direction_is_in.statsd_type_is_counter.mtype_is_count.unit_is_Metric"]
 		totalLock.Unlock()
 	}
 	go daemon.RunBare()
@@ -427,7 +427,9 @@ func BenchmarkIncomingMetrics(b *testing.B) {
 			daemon.Clock.(*clock.Mock).Add(1 * time.Second)
 		}
 		daemon.Clock.(*clock.Mock).Add(10 * time.Second)
+
 		totalLock.Lock()
+		//panic(fmt.Sprintf("Onlysaw %f", total))
 		if total != float64(1000000) {
 			panic(fmt.Sprintf("didn't see 1M counters. only saw %f", total))
 		}
@@ -437,7 +439,7 @@ func BenchmarkIncomingMetrics(b *testing.B) {
 }
 
 func BenchmarkIncomingMetricAmounts(b *testing.B) {
-	daemon := New("test", formatM1Legacy, false, false, out.Percentiles{}, 10, 1000, 1000, false, nil)
+	daemon := New("test", formatM1Legacy, false, false, out.Percentiles{}, 10, 1000, 1000, false, nil, 1, true, false)
 	daemon.Clock = clock.NewMock()
 	daemon.submitFunc = func(c *out.Counters, g *out.Gauges, t *out.Timers, deadline time.Time) {
 	}

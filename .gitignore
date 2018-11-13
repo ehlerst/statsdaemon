@@ -3,3 +3,4 @@ tester/tester
 *.test
 */*.test
 build/
+.idea

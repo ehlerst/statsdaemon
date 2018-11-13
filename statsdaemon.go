@@ -1,18 +1,23 @@
 package statsdaemon
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/raintank/statsdaemon/route"
 	"io"
 	"log"
 	"net"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/benbjohnson/clock"
+	"github.com/raintank/schema"
 	"github.com/raintank/statsdaemon/common"
 	"github.com/raintank/statsdaemon/out"
 	"github.com/raintank/statsdaemon/ticker"
@@ -53,9 +58,13 @@ type StatsDaemon struct {
 	listen_addr   string
 	admin_addr    string
 	graphite_addr string
+
+	orgid         int
+	enablekinesis bool
+	enablegraphite bool
 }
 
-func New(instance string, formatter out.Formatter, flush_rates, flush_counts bool, pct out.Percentiles, flushInterval, max_unprocessed int, max_timers_per_s uint64, debug bool, signalchan chan os.Signal) *StatsDaemon {
+func New(instance string, formatter out.Formatter, flush_rates, flush_counts bool, pct out.Percentiles, flushInterval, max_unprocessed int, max_timers_per_s uint64, debug bool, signalchan chan os.Signal, orgid int, enablegraphite bool, enablekinesis bool) *StatsDaemon {
 	return &StatsDaemon{
 		instance:            instance,
 		fmt:                 formatter,
@@ -73,6 +82,9 @@ func New(instance string, formatter out.Formatter, flush_rates, flush_counts boo
 		valid_lines:         topic.New(),
 		Invalid_lines:       topic.New(),
 		events:              topic.New(),
+		orgid:               orgid,
+		enablekinesis:       enablekinesis,
+		enablegraphite: 	 enablegraphite,
 	}
 }
 
@@ -96,7 +108,14 @@ func (s *StatsDaemon) Run(listen_addr, admin_addr, graphite_addr string) {
 	go udp.StatsListener(s.listen_addr, s.fmt.PrefixInternal, output) // set up udp listener that writes messages to output's channels (i.e. s's channels)
 	go s.adminListener()                                              // tcp admin_addr to handle requests
 	go s.metricStatsMonitor()                                         // handles requests fired by telnet api
-	go s.graphiteWriter()                                             // writes to graphite in the background
+	if s.enablekinesis == true {
+		log.Printf("Starting Kinesis writer")
+		go s.graphiteWriterM20()										  // writes to kinesis in the background
+	}
+	if s.enablegraphite == true {
+		log.Printf("Starting Graphite writer")
+		go s.graphiteWriter() // writes to graphite in the background
+	}
 	s.metricsMonitor()                                                // takes data from s.Metrics and puts them in the guage/timers/etc objects. pointers guarded by select. also listens for signals.
 }
 
@@ -193,6 +212,78 @@ func (s *StatsDaemon) instrument(st out.Type, buf []byte, now int64, name string
 	buf = out.WriteFloat64(buf, []byte(fmt.Sprintf("%s%sstatsd_type_is_%s.mtype_is_gauge.type_is_calculation.unit_is_ms", s.fmt.Prefix_m20ne_gauges, s.fmt.PrefixInternal, name)), duration_ms, now)
 	buf = out.WriteFloat64(buf, []byte(fmt.Sprintf("%s%sdirection_is_out.statsd_type_is_%s.mtype_is_rate.unit_is_Metricps", s.fmt.Prefix_m20ne_rates, s.fmt.PrefixInternal, name)), float64(num)/float64(s.flushInterval), now)
 	return buf, num
+}
+
+
+func parseMetric(s *StatsDaemon, buf []byte) (*schema.MetricData, error) {
+	errFmt3Fields := "%q: need 3 fields"
+	errFmt := "%q: %s"
+	var metrics []*schema.MetricData
+	msgs := strings.TrimSpace(string(buf))
+	scanner := bufio.NewScanner(strings.NewReader(msgs))
+	for scanner.Scan() {
+		fmt.Println(scanner.Text())
+	    msg :=scanner.Text()
+
+		log.Printf("DEBUG: PARSING metric to 2.0 %s", msg)
+		elements := strings.Fields(msg)
+		if len(elements) != 3 {
+			log.Printf("ERROR: %s", msg)
+			return nil, fmt.Errorf(errFmt3Fields, msg)
+		}
+
+		val, err := strconv.ParseFloat(elements[1], 64)
+		if err != nil {
+			log.Printf("ERROR: %s", msg)
+			return nil, fmt.Errorf(errFmt, msg, err)
+		}
+
+		timestamp, err := strconv.ParseUint(elements[2], 10, 32)
+		if err != nil {
+			log.Printf("ERROR: %s", msg)
+			return nil, fmt.Errorf(errFmt, msg, err)
+		}
+
+		nameWithTags := elements[0]
+		elements = strings.Split(nameWithTags, ";")
+		name := elements[0]
+		tags := elements[1:]
+		sort.Strings(tags)
+		nameWithTags = fmt.Sprintf("%s;%s", name, strings.Join(tags, ";"))
+
+		log.Printf("DEBUG: Converting %v %v", name, tags)
+
+		md := schema.MetricData{
+			Name:     name,
+			Interval: s.flushInterval,
+			Value:    val,
+			Unit:     "unknown",
+			Time:     int64(timestamp),
+			Mtype:    "gauge",
+			Tags:     tags,
+			OrgId:    s.orgid,
+		}
+		md.SetId()
+		log.Printf( "metric: %v", md)
+		metrics = append(metrics, &md)
+		}
+	log.Printf( "built metric: %#v", metrics)
+	return nil, nil
+}
+
+type KinesisRoute struct {
+	Publisher route.GAASPublisher
+}
+
+func (s *StatsDaemon) graphiteWriterM20() {
+	lock := &sync.Mutex{}
+	for buf := range s.graphiteQueue {
+		lock.Lock()
+		parseMetric(s, buf)
+//		err, Publisher.Publish(metrics, stream, BySeries)
+		lock.Unlock()
+	}
+	lock.Unlock()
 }
 
 // graphiteWriter is the background workers that connects to graphite and submits all pending data to it
