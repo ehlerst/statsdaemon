@@ -2,6 +2,9 @@ package statsdaemon
 
 import (
 	"fmt"
+	"github.com/raintank/schema"
+	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -311,6 +314,68 @@ func TestLowerPercentile(t *testing.T) {
 	}
 }
 
+func Test_parseMetric(t *testing.T) {
+	config := New("test", formatM1Legacy, false, false, out.Percentiles{}, 10, 1000, 1000, true, nil, 1, true, false)
+	tags := []string{"tag2=value2", "tag1=value1"}
+	newmetric := &schema.MetricData{
+		OrgId:    1,
+		Name:     "foo.metric",
+		Interval: 10,
+		Value:    0,
+		Unit:     "unknown",
+		Time:     int64(time.Now().Unix()),
+		Mtype:    "gauge",
+		Tags:     []string{},
+	}
+	newmetric.SetId()
+	newmetrictags := &schema.MetricData{
+		OrgId:    1,
+		Name:     "foo.metric",
+		Interval: 10,
+		Value:    0,
+		Unit:     "unknown",
+		Time:     int64(time.Now().Unix()),
+		Mtype:    "gauge",
+		Tags:     tags,
+	}
+	newmetrictags.SetId()
+
+	s := []string{"foo.metric 0", strconv.FormatInt(time.Now().Unix(), 10) }
+	stags := []string{"foo.metric;tag2=value2;tag1=value1 0", strconv.FormatInt(time.Now().Unix(), 10) }
+	rawmetric := strings.Join(s, " ")
+	rawmetrictags :=  strings.Join(stags, " ")
+	//rawmetrictags2 := rawmetrictags + "\n" + rawmetrictags
+
+	type args struct {
+		s   *StatsDaemon
+		buf []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *schema.MetricData
+		wantErr bool
+	}{
+
+		{"ParseMetricNoTag", args{ config,[]byte(rawmetric) },newmetric , false },
+		{"ParseMetricTag", args{ config,[]byte(rawmetrictags) },newmetrictags , false },
+	//	{"ParseMetricTag2", args{ config,[]byte(rawmetrictags2) },newmetrictags , false },
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseMetric(tt.args.s, tt.args.buf)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseMetric() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseMetric() = %+#v, want %+#v", got, tt.want)
+			}
+		})
+	}
+}
+
+
 func BenchmarkDifferentCountersAddAndProcessM1Recommended(b *testing.B) {
 	metrics := getDifferentCounters(b.N)
 	b.ResetTimer()
@@ -392,6 +457,7 @@ func BenchmarkSameTimersAddAndProcess(b *testing.B) {
 	}
 	t.Process(make([]byte, 0), time.Now().Unix(), 10, formatM1Legacy)
 }
+
 
 func BenchmarkIncomingMetrics(b *testing.B) {
 	daemon := New("test", formatM1Legacy, false, false, out.Percentiles{}, 10, 1000, 1000, true, nil, 1, true, false)

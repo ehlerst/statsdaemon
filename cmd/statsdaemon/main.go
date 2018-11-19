@@ -76,7 +76,7 @@ var (
 	GitHash     = "(none)"
 	orgid    = flag.Int("orgid", 1, "orgid, default: 1")
 
-	enablekinesis     = flag.Bool("enablekinesis", false, "eanble sending to kinesis default: false")
+	enabletsdbgw     = flag.Bool("enabletsdbgw", false, "eanble sending to tsdbgw default: false")
 	enablegraphite     = flag.Bool("enablegraphite", true, "enable sending to graphite default: true")
 )
 
@@ -196,7 +196,7 @@ func main() {
 		Prefix_m20ne_timers:   strings.Replace(*prefix_m20_timers, "=", "_is_", -1),
 	}
 
-	daemon := statsdaemon.New(inst, formatter, *flush_rates, *flush_counts, *pct, *flushInterval, MAX_UNPROCESSED_PACKETS, *max_timers_per_s, *debug, signalchan, *orgid, *enablegraphite, *enablekinesis)
+	daemon := statsdaemon.New(inst, formatter, *flush_rates, *flush_counts, *pct, *flushInterval, MAX_UNPROCESSED_PACKETS, *max_timers_per_s, *debug, signalchan, *orgid, *enablegraphite, *enabletsdbgw)
 	if *debug {
 		consumer := make(chan interface{}, 100)
 		daemon.Invalid_lines.Register(consumer)
