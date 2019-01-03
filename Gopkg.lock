@@ -97,6 +97,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:4a0c6bb4805508a6287675fac876be2ac1182539ca8a32468d8128882e9d5009"
+  name = "github.com/golang/snappy"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
+
+[[projects]]
+  branch = "master"
   digest = "1:fb28c49438f3c2b68ae0da1e91e9d2c9e5ad31514e324c42a0f60eed43a19702"
   name = "github.com/grafana/globalconf"
   packages = ["."]
@@ -109,6 +117,14 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "0b12d6b5"
+
+[[projects]]
+  digest = "1:b6bbd2f9e0724bd81890c8644259f920c6d61c08453978faff0bebd25f3e7d3e"
+  name = "github.com/jpillora/backoff"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "8eab2debe79d12b7bd3d10653910df25fa9552ba"
+  version = "1.0.0"
 
 [[projects]]
   digest = "1:ca955a9cd5b50b0f43d2cc3aeb35c951473eeca41b34eb67507f1dbcc0542394"
@@ -151,9 +167,12 @@
   revision = "955e3a77c6a8294c013cb1bf45ed3965e5f19299"
 
 [[projects]]
-  digest = "1:7ea6793296754903753333b963b4b95c32b5a393a4cbdbbfdb2d93a523cb5ce7"
+  digest = "1:d456de3a61bdb023a90d62584b5697f8a905cd82f002cbd683caa5aae1164d26"
   name = "github.com/raintank/schema"
-  packages = ["."]
+  packages = [
+    ".",
+    "msg",
+  ]
   pruneopts = "UT"
   revision = "0140483a390ec5e52dd79c5d37c699d9cfe6c9f8"
   version = "v2.1"
@@ -227,10 +246,13 @@
     "github.com/aws/aws-sdk-go/service/kinesis",
     "github.com/benbjohnson/clock",
     "github.com/bmizerany/assert",
+    "github.com/golang/snappy",
     "github.com/grafana/globalconf",
+    "github.com/jpillora/backoff",
     "github.com/metrics20/go-metrics20/carbon20",
     "github.com/raintank/dur",
     "github.com/raintank/schema",
+    "github.com/raintank/schema/msg",
     "github.com/tv42/topic",
     "github.com/ugorji/go/codec",
   ]

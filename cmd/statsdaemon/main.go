@@ -78,6 +78,8 @@ var (
 
 	enabletsdbgw     = flag.Bool("enabletsdbgw", false, "eanble sending to tsdbgw default: false")
 	enablegraphite     = flag.Bool("enablegraphite", true, "enable sending to graphite default: true")
+	tsdbgw_addr = flag.String("tsdbgw_addr", "http://localhost:8081", "tsdbgw address default: localhost:8081")
+	tsdbgw_api_key = flag.String( "tsdbgw_api_key", "nil", "tsdbgw api key default nil")
 )
 
 func expand_cfg_vars(in string) (out string) {
@@ -196,7 +198,7 @@ func main() {
 		Prefix_m20ne_timers:   strings.Replace(*prefix_m20_timers, "=", "_is_", -1),
 	}
 
-	daemon := statsdaemon.New(inst, formatter, *flush_rates, *flush_counts, *pct, *flushInterval, MAX_UNPROCESSED_PACKETS, *max_timers_per_s, *debug, signalchan, *orgid, *enablegraphite, *enabletsdbgw)
+	daemon := statsdaemon.New(inst, formatter, *flush_rates, *flush_counts, *pct, *flushInterval, MAX_UNPROCESSED_PACKETS, *max_timers_per_s, *debug, signalchan, *orgid, *enablegraphite, *enabletsdbgw, *tsdbgw_addr, *tsdbgw_api_key)
 	if *debug {
 		consumer := make(chan interface{}, 100)
 		daemon.Invalid_lines.Register(consumer)
