@@ -122,14 +122,6 @@ func (s *StatsDaemon) Run(listen_addr, admin_addr, graphite_addr string) {
 	go s.metricStatsMonitor()                                         // handles requests fired by telnet api
 	if s.enabletsdbgw == true {
 		log.Printf("Starting tsdbgw writer")
-
-		// TODO: Get carbon-relay-ng updated to use a var instead of a file
-		statsdschema := fmt.Sprintf("[statsd]\npattern = .*\nretnetions = %ds\n", s.flushInterval)
-		d1 := []byte(statsdschema)
-		err := ioutil.WriteFile("/tmp/schema.conf", d1, 0644)
-		if err != nil {
-			log.Printf("ERROR: error writing file /tmp/schema.conf")
-		}
 		go s.graphiteWriterM20()										  // writes to tsdbgw in the background
 	}
 	if s.enablegraphite == true {
