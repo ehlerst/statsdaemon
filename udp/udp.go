@@ -106,12 +106,12 @@ func StatsListener(listen_addr, prefix_internal string, output *out.Output) {
 func Listener(listen_addr, prefix_internal string, output *out.Output, parse parseLineFunc) {
 	address, err := net.ResolveUDPAddr("udp", listen_addr)
 	if err != nil {
-		log.Fatalf("ERROR: Cannot resolve '%s' - %s", listen_addr, err)
+		log.Fatalf("cannot resolve '%s' - %s", listen_addr, err)
 	}
 
 	listener, err := net.ListenUDP("udp", address)
 	if err != nil {
-		log.Fatalf("ERROR: ListenUDP - %s", err)
+		log.Fatalf("listenUDP - %s", err)
 	}
 	defer listener.Close()
 	log.Infof("listening on %s", address)
@@ -120,7 +120,7 @@ func Listener(listen_addr, prefix_internal string, output *out.Output, parse par
 	for {
 		n, remaddr, err := listener.ReadFromUDP(message)
 		if err != nil {
-			log.Errorf("ERROR: reading UDP packet from %+v - %s", remaddr, err)
+			log.Errorf("reading UDP packet from %+v - %s", remaddr, err)
 			continue
 		}
 		metrics := ParseMessage(message[:n], prefix_internal, output, parse)

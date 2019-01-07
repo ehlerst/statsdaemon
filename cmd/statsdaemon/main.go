@@ -192,7 +192,7 @@ func main() {
 	signal.Notify(signalchan)
 	if *profile_addr != "" {
 		go func() {
-			log.Info("Profiling endpoint listening on " + *profile_addr)
+			log.Info("profiling endpoint listening on " + *profile_addr)
 			log.Info(http.ListenAndServe(*profile_addr, nil))
 		}()
 	}

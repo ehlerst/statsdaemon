@@ -119,14 +119,14 @@ func (s *StatsDaemon) Run(listen_addr, admin_addr, graphite_addr string) {
 	go s.metricStatsMonitor()                                         // handles requests fired by telnet api
 
 	if s.enabletsdbgw == true && s.enablegraphite == true {
-		log.Fatal("Cannot use both tsdbgw and graphite outputs")
+		log.Fatal("cannot use both tsdbgw and graphite outputs")
 	}
 	if s.enabletsdbgw == true {
-		log.Printf("Starting tsdbgw writer")
+		log.Infof("starting tsdbgw writer")
 		go s.graphiteWriterM20()										  // writes to tsdbgw in the background
 	}
 	if s.enablegraphite == true {
-		log.Printf("Starting Graphite writer")
+		log.Infof("starting Graphite writer")
 		go s.graphiteWriter() // writes to graphite in the background
 	}
 	s.metricsMonitor()                                                // takes data from s.Metrics and puts them in the guage/timers/etc objects. pointers guarded by select. also listens for signals.
@@ -247,8 +247,7 @@ func parseMetric(s *StatsDaemon, buf []byte) ([]*schema.MetricData, error) {
 	log.Debugf("Parsing lines: %s", msgs)
 
 	for _, msg := range msgs {
-		fmt.Println(msg)
-
+		
 		log.Debugf("parsing metric to 2.0 %s", msg)
 
 		elements := strings.Fields(msg)
@@ -265,7 +264,7 @@ func parseMetric(s *StatsDaemon, buf []byte) ([]*schema.MetricData, error) {
 
 		timestamp, err := strconv.ParseUint(elements[2], 10, 32)
 		if err != nil {
-			log.Printf("ERROR: %s", msg)
+			log.Errorf("%s", msg)
 			return nil, fmt.Errorf(errFmt, msg, err)
 		}
 
@@ -351,7 +350,7 @@ func (s *StatsDaemon) retryFlush(metrics []*schema.MetricData, buffer *bytes.Buf
 			break
 		}
 		b := boff.Duration()
-		log.Printf("GrafanaNet failed to submit data: %s - will try again in %s (this attempt took %s)", err.Error(), b, dur)
+		log.Infof("grafanaNet failed to submit data: %s - will try again in %s (this attempt took %s)", err.Error(), b, dur)
 		time.Sleep(b)
 		// re-instantiate body, since the previous .Do() attempt would have Read it all the way
 		req.Body = ioutil.NopCloser(bytes.NewReader(body))
@@ -406,7 +405,7 @@ func (s *StatsDaemon) graphiteWriterM20() {
 		lock.Lock()
 		md, err := parseMetric(s, buf)
 		if err != nil {
-			log.Errorf("%v", err)
+			log.Errorf("metric parse error for %v", err)
 		}
 
 		log.Debugf("md was: %v", md)
