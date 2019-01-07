@@ -79,7 +79,7 @@ var (
 	GitHash     = "(none)"
 
 	orgid    = flag.Int("orgid", 1, "orgid, default: 1")
-	enabletsdbgw     = flag.Bool("enabletsdbgw", false, "eanble sending to tsdbgw default: false")
+	enabletsdbgw     = flag.Bool("enabletsdbgw", false, "enable sending to tsdbgw default: false")
 	enablegraphite     = flag.Bool("enablegraphite", true, "enable sending to graphite default: true")
 	tsdbgw_addr = flag.String("tsdbgw_addr", "http://localhost:8081", "tsdbgw address default: localhost:8081")
 	tsdbgw_api_key = flag.String( "tsdbgw_api_key", "nil", "tsdbgw api key default nil")

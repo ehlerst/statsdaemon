@@ -56,11 +56,27 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:7f114b78210bf5b75f307fc97cff293633c835bab1e0ea8a744a44b39c042dfe"
+  name = "github.com/golang/snappy"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
+
+[[projects]]
+  branch = "master"
   digest = "1:817bb03ae4cb923f024602aa1753f1dcea87c83e10fb3a175ca4fa7a088b1cc7"
   name = "github.com/grafana/globalconf"
   packages = ["."]
   pruneopts = "NUT"
   revision = "7a1aae0695d90c7ce662097c9589dfe1ae3c4f47"
+
+[[projects]]
+  digest = "1:ebd0081aed1cd0af2f65a362c0ceea985eae9fe72efb28cefb84eca3b98dd3a3"
+  name = "github.com/jpillora/backoff"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "8eab2debe79d12b7bd3d10653910df25fa9552ba"
+  version = "1.0.0"
 
 [[projects]]
   digest = "1:4059c14e87a2de3a434430340521b5feece186c1469eff0834c29a63870de3ed"
@@ -95,11 +111,30 @@
   revision = "717ed3a27bf9f8d2469e7ea5b36037a4793eee44"
 
 [[projects]]
+  digest = "1:44c66ad69563dbe3f8e76d7d6cad21a03626e53f1875b5ab163ded419e01ca7a"
+  name = "github.com/philhofer/fwd"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "bb6d471dc95d4fe11e432687f8b70ff496cf3136"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:d93a8a92b334a4cb605cd0f000a913c4ec84f7b35d4df2386ad8a8cc5d8efbba"
   name = "github.com/raintank/dur"
   packages = ["."]
   pruneopts = "NUT"
   revision = "7b06fb4cf9324a785c2dedea9aa4e47769d54b92"
+
+[[projects]]
+  digest = "1:695c08ec95bf5327704fdfc09fab1cb3856cc08b5e059f36e5aa60a6027f265f"
+  name = "github.com/raintank/schema"
+  packages = [
+    ".",
+    "msg",
+  ]
+  pruneopts = "NUT"
+  revision = "62e6d7933846832d7f2381631fbd956cd40234cb"
+  version = "v2.2"
 
 [[projects]]
   digest = "1:014d86c6b3f1811b99a705133b4f9e9d9c1270fed55497f0387362c728c414b3"
@@ -130,6 +165,14 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "08e90462da344fbb3880e8e47a0ddacc37508579"
+
+[[projects]]
+  digest = "1:c97e8a5e5c435c3287f581cdb4441ba34577ec6ead8422bfedafa6269af7abf6"
+  name = "github.com/tinylib/msgp"
+  packages = ["msgp"]
+  pruneopts = "NUT"
+  revision = "af6442a0fcf6e2a1b824f70dd0c734f01e817751"
+  version = "v1.1.0"
 
 [[projects]]
   branch = "master"
@@ -166,9 +209,13 @@
     "github.com/Dieterbe/profiletrigger/heap",
     "github.com/benbjohnson/clock",
     "github.com/bmizerany/assert",
+    "github.com/golang/snappy",
     "github.com/grafana/globalconf",
+    "github.com/jpillora/backoff",
     "github.com/metrics20/go-metrics20/carbon20",
     "github.com/raintank/dur",
+    "github.com/raintank/schema",
+    "github.com/raintank/schema/msg",
     "github.com/sirupsen/logrus",
     "github.com/tv42/topic",
   ]

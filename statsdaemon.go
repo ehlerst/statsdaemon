@@ -244,24 +244,22 @@ func parseMetric(s *StatsDaemon, buf []byte) ([]*schema.MetricData, error) {
 	msgs := LineScanner(buf)
 	var metrics []*schema.MetricData
 
-	if s.debug {
-		log.Printf("Parsing lines: %s", msgs)
-	}
+	log.Debugf("Parsing lines: %s", msgs)
+
 	for _, msg := range msgs {
 		fmt.Println(msg)
 
-		if s.debug {
-			log.Printf("DEBUG: parsing metric to 2.0 %s", msg)
-		}
+		log.Debugf("DEBUG: parsing metric to 2.0 %s", msg)
+
 		elements := strings.Fields(msg)
 		if len(elements) != 3 {
-			log.Printf("ERROR: %s", msg)
+			log.Errorf("%s", msg)
 			return nil, fmt.Errorf(errFmt3Fields, msg)
 		}
 
 		val, err := strconv.ParseFloat(elements[1], 64)
 		if err != nil {
-			log.Printf("ERROR: %s", msg)
+			log.Errorf("%s", msg)
 			return nil, fmt.Errorf(errFmt, msg, err)
 		}
 
@@ -277,9 +275,7 @@ func parseMetric(s *StatsDaemon, buf []byte) ([]*schema.MetricData, error) {
 		tags := elements[1:]
 		sort.Strings(tags)
 		nameWithTags = fmt.Sprintf("%s;%s", name, strings.Join(tags, ";"))
-		if s.debug {
-			log.Printf("DEBUG: converting %v %v", name, tags)
-		}
+		log.Debugf("converting %v %v", name, tags)
 		md := &schema.MetricData{
 			Name:     name,
 			Interval: s.flushInterval,
@@ -291,15 +287,11 @@ func parseMetric(s *StatsDaemon, buf []byte) ([]*schema.MetricData, error) {
 			OrgId:    s.orgid,
 		}
 		md.SetId()
-		if s.debug {
-			log.Printf("DEBUG: metric: %v", md)
-		}
+		log.Debugf("metric: %v", md)
 		metrics = append(metrics, md)
 
 	}
-	if s.debug {
-		log.Printf("DEBUG: metrics created: %d", len(metrics))
-	}
+	log.Debugf("metrics created: %d", len(metrics))
 	return metrics, nil
 }
 
@@ -414,12 +406,10 @@ func (s *StatsDaemon) graphiteWriterM20() {
 		lock.Lock()
 		md, err := parseMetric(s, buf)
 		if err != nil {
-			log.Printf("ERROR: %v", err)
+			log.Errorf("%v", err)
 		}
 
-		if s.debug {
-			log.Printf("DEBUG: md was: %v", md)
-		}
+		log.Debugf("md was: %v", md)
 		s.retryFlush(md, buffer)
 		lock.Unlock()
 	}

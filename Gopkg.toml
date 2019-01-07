@@ -24,6 +24,9 @@
 #   go-tests = true
 #   unused-packages = true
 
+[[constraint]]
+  name = "github.com/raintank/schema"
+  version = "^2"
 
 [[constraint]]
   branch = "master"
