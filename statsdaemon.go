@@ -249,7 +249,7 @@ func parseMetric(s *StatsDaemon, buf []byte) ([]*schema.MetricData, error) {
 	for _, msg := range msgs {
 		fmt.Println(msg)
 
-		log.Debugf("DEBUG: parsing metric to 2.0 %s", msg)
+		log.Debugf("parsing metric to 2.0 %s", msg)
 
 		elements := strings.Fields(msg)
 		if len(elements) != 3 {
@@ -297,7 +297,7 @@ func parseMetric(s *StatsDaemon, buf []byte) ([]*schema.MetricData, error) {
 
 func (s *StatsDaemon) flush(req *http.Request) (time.Duration, error) {
 	pre := time.Now()
-	log.Printf("DEBUG: request is %v", req)
+	log.Debugf("request is %v", req)
 	resp, err := s.client.Do(req)
 	dur := time.Since(pre)
 	if err != nil {
@@ -312,7 +312,7 @@ func (s *StatsDaemon) flush(req *http.Request) (time.Duration, error) {
 	n, _ := resp.Body.Read(buf)
 	ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
-	log.Printf("DEBUG: http %d - %v", resp.StatusCode, resp)
+	log.Debugf("http %d - %v", resp.StatusCode, resp)
 	return dur, fmt.Errorf("http %d - %s", resp.StatusCode, buf[:n])
 }
 
@@ -331,7 +331,7 @@ func (s *StatsDaemon) retryFlush(metrics []*schema.MetricData, buffer *bytes.Buf
 	snappyBody.Write(data)
 	snappyBody.Close()
 	body := buffer.Bytes()
-	log.Printf("DEBUG: sending to %s", s.tsdbgw_addr)
+	log.Debugf("sending to %s", s.tsdbgw_addr)
 	req, err := http.NewRequest("POST", s.tsdbgw_addr, bytes.NewReader(body))
 	if err != nil {
 		panic(err)
@@ -356,7 +356,7 @@ func (s *StatsDaemon) retryFlush(metrics []*schema.MetricData, buffer *bytes.Buf
 		// re-instantiate body, since the previous .Do() attempt would have Read it all the way
 		req.Body = ioutil.NopCloser(bytes.NewReader(body))
 	}
-	log.Printf("DEBUG: GrafanaNet sent metrics in %s -msg size %d", dur, len(metrics))
+	log.Debugf("GrafanaNet sent metrics in %s -msg size %d", dur, len(metrics))
 	//route.durationTickFlush.Update(dur)
 	//route.tickFlushSize.Update(int64(len(metrics)))
 
