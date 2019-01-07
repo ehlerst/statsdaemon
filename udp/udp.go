@@ -8,6 +8,7 @@ import (
 	"github.com/raintank/statsdaemon/out"
 	reuse "github.com/libp2p/go-reuseport"
 	log "github.com/sirupsen/logrus"
+    reuse "github.com/libp2p/go-reuseport"
 	"net"
 	"strconv"
 )

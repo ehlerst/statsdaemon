@@ -483,11 +483,11 @@ func (s *StatsDaemon) handleApiRequest(conn net.Conn, write_first []byte) {
 func (s *StatsDaemon) adminListener() {
 	l, err := net.Listen("tcp", s.admin_addr)
 	if err != nil {
-		fmt.Println("Error listening:", err.Error())
+		fmt.Println("error listening:", err.Error())
 		os.Exit(1)
 	}
 	defer l.Close()
-	log.Info("Listening on " + s.admin_addr)
+	log.Info("admin listening on " + s.admin_addr)
 	for {
 		// Listen for an incoming connection.
 		conn, err := l.Accept()
