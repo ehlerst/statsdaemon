@@ -1,17 +1,27 @@
 package statsdaemon
 
 import (
+	"bufio"
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/benbjohnson/clock"
+	"github.com/golang/snappy"
+	"github.com/jpillora/backoff"
+	"github.com/raintank/schema"
+	"github.com/raintank/schema/msg"
 	"github.com/raintank/statsdaemon/common"
 	"github.com/raintank/statsdaemon/out"
 	"github.com/raintank/statsdaemon/ticker"
@@ -45,6 +55,7 @@ type StatsDaemon struct {
 	valid_lines         *topic.Topic
 	Invalid_lines       *topic.Topic
 	events              *topic.Topic
+	client              *http.Client
 
 	Clock         clock.Clock
 	submitFunc    SubmitFunc
@@ -53,9 +64,15 @@ type StatsDaemon struct {
 	listen_addr   string
 	admin_addr    string
 	graphite_addr string
+
+	orgid          int
+	tsdbgw_addr    string
+	tsdbgw_api_key string
+	enabletsdbgw   bool
+	enablegraphite bool
 }
 
-func New(instance string, formatter out.Formatter, flush_rates, flush_counts bool, pct out.Percentiles, flushInterval, max_unprocessed int, max_timers_per_s uint64, signalchan chan os.Signal) *StatsDaemon {
+func New(instance string, formatter out.Formatter, flush_rates, flush_counts bool, pct out.Percentiles, flushInterval, max_unprocessed int, max_timers_per_s uint64, signalchan chan os.Signal, orgid int, enablegraphite bool, enabletsdbgw bool, tsdbgw_addr string, tsdbgw_api_key string) *StatsDaemon {
 	return &StatsDaemon{
 		instance:            instance,
 		fmt:                 formatter,
@@ -72,6 +89,11 @@ func New(instance string, formatter out.Formatter, flush_rates, flush_counts boo
 		valid_lines:         topic.New(),
 		Invalid_lines:       topic.New(),
 		events:              topic.New(),
+		orgid:               orgid,
+		enabletsdbgw:        enabletsdbgw,
+		enablegraphite: 	 enablegraphite,
+		tsdbgw_api_key:      tsdbgw_api_key,
+		tsdbgw_addr:         tsdbgw_addr,
 	}
 }
 
@@ -95,7 +117,18 @@ func (s *StatsDaemon) Run(listen_addr, admin_addr, graphite_addr string) {
 	go udp.StatsListener(s.listen_addr, s.fmt.PrefixInternal, output) // set up udp listener that writes messages to output's channels (i.e. s's channels)
 	go s.adminListener()                                              // tcp admin_addr to handle requests
 	go s.metricStatsMonitor()                                         // handles requests fired by telnet api
-	go s.graphiteWriter()                                             // writes to graphite in the background
+
+	if s.enabletsdbgw == true && s.enablegraphite == true {
+		log.Fatal("Cannot use both tsdbgw and graphite outputs")
+	}
+	if s.enabletsdbgw == true {
+		log.Printf("Starting tsdbgw writer")
+		go s.graphiteWriterM20()										  // writes to tsdbgw in the background
+	}
+	if s.enablegraphite == true {
+		log.Printf("Starting Graphite writer")
+		go s.graphiteWriter() // writes to graphite in the background
+	}
 	s.metricsMonitor()                                                // takes data from s.Metrics and puts them in the guage/timers/etc objects. pointers guarded by select. also listens for signals.
 }
 
@@ -193,6 +226,207 @@ func (s *StatsDaemon) instrument(st out.Type, buf []byte, now int64, name string
 	buf = out.WriteFloat64(buf, []byte(fmt.Sprintf("%s%sdirection_is_out.statsd_type_is_%s.mtype_is_rate.unit_is_Metricps", s.fmt.Prefix_m20ne_rates, s.fmt.PrefixInternal, name)), float64(num)/float64(s.flushInterval), now)
 	return buf, num
 }
+
+
+func LineScanner(buf []byte) []string {
+	var lines []string
+	msgs := strings.TrimSpace(string(buf))
+	scanner := bufio.NewScanner(strings.NewReader(msgs))
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines
+}
+
+func parseMetric(s *StatsDaemon, buf []byte) ([]*schema.MetricData, error) {
+	errFmt3Fields := "%q: need 3 fields"
+	errFmt := "%q: %s"
+	msgs := LineScanner(buf)
+	var metrics []*schema.MetricData
+
+	if s.debug {
+		log.Printf("Parsing lines: %s", msgs)
+	}
+	for _, msg := range msgs {
+		fmt.Println(msg)
+
+		if s.debug {
+			log.Printf("DEBUG: parsing metric to 2.0 %s", msg)
+		}
+		elements := strings.Fields(msg)
+		if len(elements) != 3 {
+			log.Printf("ERROR: %s", msg)
+			return nil, fmt.Errorf(errFmt3Fields, msg)
+		}
+
+		val, err := strconv.ParseFloat(elements[1], 64)
+		if err != nil {
+			log.Printf("ERROR: %s", msg)
+			return nil, fmt.Errorf(errFmt, msg, err)
+		}
+
+		timestamp, err := strconv.ParseUint(elements[2], 10, 32)
+		if err != nil {
+			log.Printf("ERROR: %s", msg)
+			return nil, fmt.Errorf(errFmt, msg, err)
+		}
+
+		nameWithTags := elements[0]
+		elements = strings.Split(nameWithTags, ";")
+		name := elements[0]
+		tags := elements[1:]
+		sort.Strings(tags)
+		nameWithTags = fmt.Sprintf("%s;%s", name, strings.Join(tags, ";"))
+		if s.debug {
+			log.Printf("DEBUG: converting %v %v", name, tags)
+		}
+		md := &schema.MetricData{
+			Name:     name,
+			Interval: s.flushInterval,
+			Value:    val,
+			Unit:     "unknown",
+			Time:     int64(timestamp),
+			Mtype:    "gauge",
+			Tags:     tags,
+			OrgId:    s.orgid,
+		}
+		md.SetId()
+		if s.debug {
+			log.Printf("DEBUG: metric: %v", md)
+		}
+		metrics = append(metrics, md)
+
+	}
+	if s.debug {
+		log.Printf("DEBUG: metrics created: %d", len(metrics))
+	}
+	return metrics, nil
+}
+
+func (s *StatsDaemon) flush(req *http.Request) (time.Duration, error) {
+	pre := time.Now()
+	log.Printf("DEBUG: request is %v", req)
+	resp, err := s.client.Do(req)
+	dur := time.Since(pre)
+	if err != nil {
+		return dur, err
+	}
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		return dur, nil
+	}
+	buf := make([]byte, 300)
+	n, _ := resp.Body.Read(buf)
+	ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	log.Printf("DEBUG: http %d - %v", resp.StatusCode, resp)
+	return dur, fmt.Errorf("http %d - %s", resp.StatusCode, buf[:n])
+}
+
+func (s *StatsDaemon) retryFlush(metrics []*schema.MetricData, buffer *bytes.Buffer) []*schema.MetricData {
+	if len(metrics) == 0 {
+		return metrics
+	}
+
+	data, err := msg.CreateMsg(metrics, int64(s.orgid), msg.FormatMetricDataArrayMsgp)
+	if err != nil {
+		panic(err)
+	}
+	buffer.Reset()
+
+	snappyBody := snappy.NewBufferedWriter(buffer)
+	snappyBody.Write(data)
+	snappyBody.Close()
+	body := buffer.Bytes()
+	log.Printf("DEBUG: sending to %s", s.tsdbgw_addr)
+	req, err := http.NewRequest("POST", s.tsdbgw_addr, bytes.NewReader(body))
+	if err != nil {
+		panic(err)
+	}
+	req.Header.Add("Authorization", "Bearer "+s.tsdbgw_api_key)
+	req.Header.Add("Content-Type", "rt-metric-binary-snappy")
+	boff := &backoff.Backoff{
+		Min:    100 * time.Millisecond,
+		Max:    30 * time.Second,
+		Factor: 1.5,
+		Jitter: true,
+	}
+	var dur time.Duration
+	for {
+		dur, err = s.flush(req)
+		if err == nil {
+			break
+		}
+		b := boff.Duration()
+		log.Printf("GrafanaNet failed to submit data: %s - will try again in %s (this attempt took %s)", err.Error(), b, dur)
+		time.Sleep(b)
+		// re-instantiate body, since the previous .Do() attempt would have Read it all the way
+		req.Body = ioutil.NopCloser(bytes.NewReader(body))
+	}
+	log.Printf("DEBUG: GrafanaNet sent metrics in %s -msg size %d", dur, len(metrics))
+	//route.durationTickFlush.Update(dur)
+	//route.tickFlushSize.Update(int64(len(metrics)))
+
+	return metrics[:0]
+}
+
+func (s *StatsDaemon) graphiteWriterM20() {
+
+	lock := &sync.Mutex{}
+
+	var concurrency = 1  // number of concurrent connections to tsdb-gw, running statsdaemon in sidecar mode you probably only want 1
+	var timeout time.Duration// in ms
+	timeout = 10 * time.Second
+
+	// Most of this is copy paste from https://github.com/graphite-ng/carbon-relay-ng/blob/master/route/grafananet.go
+	// start off with a transport the same as Go's DefaultTransport
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          concurrency,
+		MaxIdleConnsPerHost:   concurrency,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
+	// disable http 2.0 because there seems to be a compatibility problem between nginx hosts and the golang http2 implementation
+	// which would occasionally result in bogus `400 Bad Request` errors.
+	transport.TLSNextProto = make(map[string]func(authority string, c *tls.Conn) http.RoundTripper)
+
+
+	s.client = &http.Client{
+		Timeout:   timeout,
+		Transport: transport,
+	}
+
+	buffer := new(bytes.Buffer)
+
+	for buf := range s.graphiteQueue {
+		lock.Lock()
+		md, err := parseMetric(s, buf)
+		if err != nil {
+			log.Printf("ERROR: %v", err)
+		}
+
+		if s.debug {
+			log.Printf("DEBUG: md was: %v", md)
+		}
+		s.retryFlush(md, buffer)
+		lock.Unlock()
+	}
+	lock.Unlock()
+
+}
+
 
 // graphiteWriter is the background workers that connects to graphite and submits all pending data to it
 // TODO: conn.Write() returns no error for a while when the remote endpoint is down, the reconnect happens with a delay
