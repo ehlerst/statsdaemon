@@ -155,6 +155,7 @@ func main() {
 	}
 
 	runtime.GOMAXPROCS(*processes)
+	fmt.Printf(string(runtime.GOMAXPROCS(*processes)))
 	pct, err := out.NewPercentiles(*percentile_thresholds)
 	if err != nil {
 		log.Fatal(err)
@@ -203,5 +204,5 @@ func main() {
 			}
 		}()
 	}
-	daemon.Run(*listen_addr, *admin_addr, *graphite_addr)
+	daemon.Run(*listen_addr, *admin_addr, *graphite_addr, *processes)
 }

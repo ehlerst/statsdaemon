@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/raintank/statsdaemon/common"
 	"github.com/raintank/statsdaemon/out"
+    reuse "github.com/libp2p/go-reuseport"
 	"log"
 	"net"
 	"strconv"
@@ -101,6 +102,7 @@ func StatsListener(listen_addr, prefix_internal string, output *out.Output) {
 	Listener(listen_addr, prefix_internal, output, ParseLine2)
 }
 
+
 // Listener receives packets from the udp buffer, parses them and feeds both the Metrics channel
 // as well as the metricAmounts channel
 func Listener(listen_addr, prefix_internal string, output *out.Output, parse parseLineFunc) {
@@ -109,7 +111,9 @@ func Listener(listen_addr, prefix_internal string, output *out.Output, parse par
 		log.Fatalf("ERROR: Cannot resolve '%s' - %s", listen_addr, err)
 	}
 
-	listener, err := net.ListenUDP("udp", address)
+	// listen on the same port
+	listener, err := reuse.ListenPacket("udp", listen_addr)
+
 	if err != nil {
 		log.Fatalf("ERROR: ListenUDP - %s", err)
 	}
@@ -118,7 +122,7 @@ func Listener(listen_addr, prefix_internal string, output *out.Output, parse par
 
 	message := make([]byte, MaxUdpPacketSize)
 	for {
-		n, remaddr, err := listener.ReadFromUDP(message)
+		n, remaddr, err := listener.ReadFrom(message)
 		if err != nil {
 			log.Printf("ERROR: reading UDP packet from %+v - %s", remaddr, err)
 			continue

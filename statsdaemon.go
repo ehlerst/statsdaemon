@@ -77,7 +77,7 @@ func New(instance string, formatter out.Formatter, flush_rates, flush_counts boo
 }
 
 // start statsdaemon instance with standard network daemon behaviors
-func (s *StatsDaemon) Run(listen_addr, admin_addr, graphite_addr string) {
+func (s *StatsDaemon) Run(listen_addr, admin_addr, graphite_addr string, processes int) {
 	s.Clock = clock.New()
 	s.submitFunc = s.GraphiteQueue
 	s.graphiteQueue = make(chan []byte, 1000)
@@ -93,7 +93,11 @@ func (s *StatsDaemon) Run(listen_addr, admin_addr, graphite_addr string) {
 		Valid_lines:   s.valid_lines,
 		Invalid_lines: s.Invalid_lines,
 	}
-	go udp.StatsListener(s.listen_addr, s.fmt.PrefixInternal, output) // set up udp listener that writes messages to output's channels (i.e. s's channels)
+	log.Printf("starting processes %d \n", processes)
+	for i := processes; i > 0; i-- {
+		log.Printf("starting listener %d \n", i)
+		go udp.StatsListener(s.listen_addr, s.fmt.PrefixInternal, output) // set up udp listener that writes messages to output's channels (i.e. s's channels)
+	}
 	go s.adminListener()                                              // tcp admin_addr to handle requests
 	go s.metricStatsMonitor()                                         // handles requests fired by telnet api
 	go s.graphiteWriter()                                             // writes to graphite in the background
