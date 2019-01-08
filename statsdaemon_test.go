@@ -2,6 +2,7 @@ package statsdaemon
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"testing"
@@ -464,4 +465,63 @@ func BenchmarkIncomingMetricAmounts(b *testing.B) {
 		daemon.Clock.(*clock.Mock).Add(10 * time.Second)
 	}
 
+}
+
+
+func RunIncomingMetricsUDP(b *testing.B, packets int, processses int) {
+	daemon := New("test", formatM1Legacy, false, false, out.Percentiles{}, 1, 1, 1000, nil)
+	daemon.Clock = clock.NewMock()
+	total := float64(0)
+	daemon.submitFunc = func(c *out.Counters, g *out.Gauges, t *out.Timers, deadline time.Time) {
+		total += c.Values["internal.direction_is_in.statsd_type_is_counter.mtype_is_count.unit_is_Metric"]
+	}
+
+	output := &out.Output{
+		Metrics:       daemon.Metrics,
+		MetricAmounts: daemon.metricAmounts,
+		Valid_lines:   daemon.valid_lines,
+		Invalid_lines: daemon.Invalid_lines,
+	}
+
+	go daemon.RunBareUDP("127.0.0.1:8125",  processses, output)
+	b.ResetTimer()
+
+	conn, err := net.Dial("udp", "127.0.0.1:8125")
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+
+	var wg sync.WaitGroup
+	wg.Add(16)
+
+	// This must be hard coded to something to make the benchmark fair
+	jobsize := packets / 16
+
+	for i := 16; i > 0; i-- {
+		go func(i int, wg *sync.WaitGroup) {
+			defer wg.Done()
+			for i := 0; i < jobsize; i++ {
+				fmt.Fprintf(conn, "test-counter-test-counter-test-counter-test-counter-test-counter-test-counter-test-counter-test-counter-test-counter-test-counter-test-counter-test-counter-test-counter-test-counter-test-counter-test-counter:1|c")
+			}
+		}(i, &wg)
+	}
+
+    wg.Wait()
+
+	daemon.Clock.(*clock.Mock).Add(10 * time.Second)
+	b.Logf("sent %d packets", packets)
+	b.Logf("received %f packets", total)
+	b.Logf("percent sucess: %f ",  total / float64(packets) * 100)
+
+}
+
+func BenchmarkUDP1(b *testing.B) {
+	RunIncomingMetricsUDP(b, 1000000, 1)
+}
+func BenchmarkUDP4(b *testing.B) {
+	RunIncomingMetricsUDP(b, 1000000, 4)
+}
+func BenchmarkUDP8(b *testing.B) {
+	RunIncomingMetricsUDP(b, 1000000, 8)
 }

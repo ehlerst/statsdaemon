@@ -103,6 +103,19 @@ func (s *StatsDaemon) Run(listen_addr, admin_addr, graphite_addr string, process
 	s.metricsMonitor()                                                // takes data from s.Metrics and puts them in the guage/timers/etc objects. pointers guarded by select. also listens for signals.
 }
 
+// start statsdaemon instance, only processing incoming metrics from the the listener and flushing
+// no admin listener
+func (s *StatsDaemon) RunBareUDP(listen_addr string, processes int,output *out.Output) {
+	log.Infof("statsdaemon instance '%s' starting", s.instance)
+	log.Infof("starting processes %d \n", processes)
+	for i := processes; i > 0; i-- {
+		log.Infof("starting listener %d \n", i)
+		go udp.StatsListener(listen_addr, s.fmt.PrefixInternal, output) // set up udp listener that writes messages to output's channels (i.e. s's channels)
+	}
+	go s.metricStatsMonitor()
+	s.metricsMonitor()
+}
+
 // start statsdaemon instance, only processing incoming metrics from the channel, and flushing
 // no admin listener
 // up to you to write to Metrics and metricAmounts channels, and set submitFunc, and set the clock
